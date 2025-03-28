@@ -36,32 +36,69 @@
             h();
             w();
         } else {
-            // Process jQuery scripts first, then others
-            const scripts = [...document.querySelectorAll("script[data-debloat-delay]")];
-            const links = [...document.querySelectorAll("link[data-debloat-delay]")];
-
-            // Filter scripts to handle jQuery first
-            const jqueryScripts = scripts.filter(script =>
-                script.src && (script.src.includes('jquery') || script.dataset.src && script.dataset.src.includes('jquery'))
-            );
-            const otherScripts = scripts.filter(script =>
-                !script.src || (!script.src.includes('jquery') && (!script.dataset.src || !script.dataset.src.includes('jquery')))
-            );
-
-            // Process jQuery first
-            jqueryScripts.forEach(e => b(e));
-
-            // Process other scripts with a slight delay to ensure jQuery is loaded
-            setTimeout(() => {
-                otherScripts.forEach(e => b(e));
-            }, 50);
-
-            // Process links as before
-            links.forEach(e => b(e));
+            // Process scripts in the right order, ensuring jQuery is fully loaded first
+            processScriptsSequentially();
         }
         document.addEventListener("debloat-load-css", () => w(true));
         document.addEventListener("debloat-load-js", () => h(true));
     }
+
+    // New function to process scripts in the correct sequence
+    function processScriptsSequentially() {
+        const scripts = [...document.querySelectorAll("script[data-debloat-delay]")];
+        const links = [...document.querySelectorAll("link[data-debloat-delay]")];
+
+        // Find jQuery scripts
+        const jqueryScripts = scripts.filter(script =>
+            script.src && script.src.includes('jquery') ||
+            script.dataset.src && script.dataset.src.includes('jquery')
+        );
+
+        // All other scripts
+        const otherScripts = scripts.filter(script =>
+            !jqueryScripts.includes(script)
+        );
+
+        // Process jQuery first and wait for it to complete
+        const processJquery = async () => {
+            for (const script of jqueryScripts) {
+                await b(script);
+
+                // Add a small delay to ensure jQuery is initialized
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+
+            // Check if jQuery is available before processing other scripts
+            let jQueryCheckAttempts = 0;
+            const checkJQuery = async () => {
+                if (typeof window.jQuery !== 'undefined') {
+                    // jQuery is available, process other scripts
+                    for (const script of otherScripts) {
+                        await b(script);
+                    }
+                } else if (jQueryCheckAttempts < 10) {
+                    // Try again after a short delay
+                    jQueryCheckAttempts++;
+                    setTimeout(checkJQuery, 100);
+                } else {
+                    // Proceed anyway after multiple attempts
+                    console.warn('jQuery not found after waiting, proceeding with other scripts');
+                    for (const script of otherScripts) {
+                        await b(script);
+                    }
+                }
+            };
+
+            checkJQuery();
+        };
+
+        // Start processing
+        processJquery().then(() => {
+            // Process CSS links after scripts
+            links.forEach(link => b(link));
+        });
+    }
+
     function h(e) {
         f = [...document.querySelectorAll("script[data-debloat-delay]")];
         if (f.length) {
