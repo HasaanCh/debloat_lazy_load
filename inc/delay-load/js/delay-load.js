@@ -36,23 +36,41 @@
             h();
             w();
         } else {
-            const scripts = [ ...document.querySelectorAll("script[data-debloat-delay]") ];
-            const links = [ ...document.querySelectorAll("link[data-debloat-delay]") ];
-            scripts.forEach(e => b(e));
+            // Process jQuery scripts first, then others
+            const scripts = [...document.querySelectorAll("script[data-debloat-delay]")];
+            const links = [...document.querySelectorAll("link[data-debloat-delay]")];
+
+            // Filter scripts to handle jQuery first
+            const jqueryScripts = scripts.filter(script =>
+                script.src && (script.src.includes('jquery') || script.dataset.src && script.dataset.src.includes('jquery'))
+            );
+            const otherScripts = scripts.filter(script =>
+                !script.src || (!script.src.includes('jquery') && (!script.dataset.src || !script.dataset.src.includes('jquery')))
+            );
+
+            // Process jQuery first
+            jqueryScripts.forEach(e => b(e));
+
+            // Process other scripts with a slight delay to ensure jQuery is loaded
+            setTimeout(() => {
+                otherScripts.forEach(e => b(e));
+            }, 50);
+
+            // Process links as before
             links.forEach(e => b(e));
         }
         document.addEventListener("debloat-load-css", () => w(true));
         document.addEventListener("debloat-load-js", () => h(true));
     }
     function h(e) {
-        f = [ ...document.querySelectorAll("script[data-debloat-delay]") ];
+        f = [...document.querySelectorAll("script[data-debloat-delay]")];
         if (f.length) {
             E();
             y("js", e);
         }
     }
     function w(e) {
-        t = [ ...document.querySelectorAll("link[data-debloat-delay]") ];
+        t = [...document.querySelectorAll("link[data-debloat-delay]")];
         if (t.length) {
             y("css", e);
         }
@@ -65,35 +83,35 @@
             n || o === "onload" ? v() : D(v);
         }
         switch (o) {
-          case "onload":
-            D(() => a(n));
-            break;
-          case "interact":
-            let e = false;
-            const s = [ "mousemove", "mousedown", "keydown", "touchstart", "wheel" ];
-            const c = () => {
-                if (e) {
-                    return;
-                }
-                e = true;
-                t === "js" ? O(() => setTimeout(a, 2)) : a();
-            };
-            s.forEach(e => {
-                document.addEventListener(e, c, {
-                    passive: true,
-                    once: true
+            case "onload":
+                D(() => a(n));
+                break;
+            case "interact":
+                let e = false;
+                const s = ["mousemove", "mousedown", "keydown", "touchstart", "wheel"];
+                const c = () => {
+                    if (e) {
+                        return;
+                    }
+                    e = true;
+                    t === "js" ? O(() => setTimeout(a, 2)) : a();
+                };
+                s.forEach(e => {
+                    document.addEventListener(e, c, {
+                        passive: true,
+                        once: true
+                    });
                 });
-            });
-            if (t === "js" && r.jsDelayMax) {
-                O(() => setTimeout(c, r.jsDelayMax * 1e3));
-            }
-            break;
-          case "custom-delay":
-            D(() => {
-                const e = parseInt(element.dataset.customDelay) * 1e3;
-                setTimeout(a, e);
-            });
-            break;
+                if (t === "js" && r.jsDelayMax) {
+                    O(() => setTimeout(c, r.jsDelayMax * 1e3));
+                }
+                break;
+            case "custom-delay":
+                D(() => {
+                    const e = parseInt(element.dataset.customDelay) * 1e3;
+                    setTimeout(a, e);
+                });
+                break;
         }
     }
     function g() {
@@ -181,7 +199,7 @@
             e = o(t);
             t.href = a;
         }
-        [ "debloatDelay", "src" ].forEach(e => {
+        ["debloatDelay", "src"].forEach(e => {
             t.dataset[e] = "";
             delete t.dataset[e];
         });
@@ -199,8 +217,8 @@
         e("load", window);
         e("readystatechange", document);
         e("pageshow", window);
-        const t = function(e, t, ...n) {
-            const o = [ "readystatechange", "DOMContentLoaded", "load", "pageshow" ];
+        const t = function (e, t, ...n) {
+            const o = ["readystatechange", "DOMContentLoaded", "load", "pageshow"];
             if (l && !i && o.includes(e)) {
                 s && console.log("Adding: ", e, t, n);
                 const a = {
