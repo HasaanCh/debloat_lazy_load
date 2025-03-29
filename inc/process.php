@@ -113,22 +113,9 @@ class Process
 		// Add delay load JS and extras as needed.
 		$html = Plugin::delay_load()->render($html);
 
-		// For first-time visitors, set a cookie
-		if (!isset($_COOKIE['debloat_user'])) {
-			setcookie('debloat_user', '1', time() + (86400 * 365), '/'); // Set cookie for 1 year
-			
-			// Also add small JavaScript to mark this visitor in localStorage
-			$js_code = "
-			<script>
-			try { localStorage.setItem('debloat_user', '1'); } catch(e) {}
-			</script>";
-			
-			// Add before closing body tag if possible
-			if (strpos($html, '</body>') !== false) {
-				$html = str_replace('</body>', $js_code . "\n</body>", $html);
-			} else {
-				$html .= $js_code;
-			}
+		// Set cookie for first-time visitors if not already set
+		if (!isset($_COOKIE['debloat_user']) && !headers_sent()) {
+			setcookie('debloat_user', '1', time() + (86400 * 365), '/');
 		}
 
 		// Failed at processing DOM, return original.
@@ -167,11 +154,6 @@ class Process
 		libxml_clear_errors();
 		libxml_use_internal_errors($libxml_previous);
 
-		// Deprecating xpath querying.
-		// if ($result) {
-			// $dom->xpath = new \DOMXPath($dom);
-		// }
-
 		return $result ? $dom : false;
 	}
 
@@ -182,6 +164,11 @@ class Process
 	 */
 	public function should_process()
 	{
+		// Check for returning visitors - if cookie exists, skip processing
+		if (isset($_COOKIE['debloat_user'])) {
+			return false;
+		}
+		
 		if (is_admin()) {
 			return false;
 		}
@@ -192,19 +179,6 @@ class Process
 
 		if (isset($_GET['nodebloat'])) {
 			return false;
-		}
-
-		// MODIFIED: Don't run the plugin at all for returning visitors
-		if (isset($_COOKIE['debloat_user']) || (isset($_SERVER['HTTP_COOKIE']) && strpos($_SERVER['HTTP_COOKIE'], 'debloat_user') !== false)) {
-			return false;
-		}
-
-		// Also check localStorage via JavaScript cookie
-		if (!empty($_COOKIE['localStorage_check'])) {
-			$localStorage = json_decode(stripslashes($_COOKIE['localStorage_check']), true);
-			if (isset($localStorage['debloat_user'])) {
-				return false;
-			}
 		}
 
 		if (Util\is_elementor()) {
